@@ -46,6 +46,20 @@ def read_from_tokens(tokens: list) -> list:
 
 assert parse(program) == ['begin', ['define', 'r', 10], ['*', 'pi', ['*', 'r', 'r']]]
 
+class Env(dict):
+    def __init__(self, parms=(), args=(), outer=None):
+        self.update(zip(parms, args))
+        self.outer = outer
+
+    def find(self, var):
+        return self if (var in self) else self.outer.find(var)
+
+class Procedure:
+    def __init__(self, parms, body, env):
+        self.parms, self.body, self.env = parms, body, env
+    def __call__(self, *args):
+        return eval(self.body, Env(self.parms, args, self.env))
+
 import math
 import operator as op
 
@@ -87,22 +101,33 @@ global_env = standard_env()
 def eval(x: Exp, env=global_env) -> Exp:
     '''Eval expression in environment'''
     if isinstance(x, Symbol):
-        return env[x]
+        return env.find(x)[x]
     elif isinstance(x, Number):
         return x
-    elif x[0] == 'if':
-        (_, test, conseq, alt) = x
-        exp = (conseq if eval(test) else alt)
+    
+    op, *args = x
+
+    if op == 'quote':
+        return args[0]
+    elif op == 'if':
+        (test, conseq, alt) = args
+        exp = (conseq if eval(test, env) else alt)
 
         return eval(exp)
-    elif x[0] == 'define':
-        (_, symbol, exp) = x
-        env[symbol] = eval(exp)
+    elif op == 'set!':
+        (symbol, exp) = args
+        env.find(symbol)[symbol] = eval(exp, env)
+    elif op == 'define':
+        (symbol, exp) = args
+        env[symbol] = eval(exp, env)
+    elif op == 'lambda':
+        parms, body = args
+        return Procedure(parms, body, env)
     else:
-        proc = eval(x[0])
-        args = [eval(arg) for arg in x[1:]]
+        proc = eval(op, env)
+        vals = [eval(arg, env) for arg in args]
 
-        return proc(*args)
+        return proc(*vals)
 
 def repl(prompt='list.py> '):
     while True:
@@ -121,5 +146,3 @@ def schemestr(exp):
         return '(' + ' '.join(map(schemestr, exp)) + ')'
     else:
         return str(exp)
-
-a = eval(parse("(begin (define r 10) (* pi (* r r)))"))
