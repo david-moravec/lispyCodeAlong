@@ -104,4 +104,22 @@ def eval(x: Exp, env=global_env) -> Exp:
 
         return proc(*args)
 
+def repl(prompt='list.py> '):
+    while True:
+        raw_input = input(prompt)
+
+        if raw_input == 'quit':
+            break
+
+        val = eval(parse(raw_input))
+
+        if val is not None:
+            print(schemestr(val))
+
+def schemestr(exp):
+    if isinstance(exp, List):
+        return '(' + ' '.join(map(schemestr, exp)) + ')'
+    else:
+        return str(exp)
+
 a = eval(parse("(begin (define r 10) (* pi (* r r)))"))
